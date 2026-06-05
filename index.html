@@ -6,41 +6,129 @@
     <title>Canlı TV Platformu</title>
     <link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet" />
     <style>
+        :root {
+            --bg-color: #0f1115;
+            --panel-bg: #1a1d24;
+            --text-color: #ffffff;
+            --accent-color: #e50914; /* Netflix Kırmızısı */
+            --hover-color: #2a2d35;
+        }
         body { 
-            background-color: #111; 
-            color: white; 
-            font-family: Arial, sans-serif; 
-            text-align: center; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             margin: 0; 
-            padding: 20px; 
+            padding: 0;
         }
-        .player-container { 
-            max-width: 800px; 
-            margin: 0 auto; 
-            background: #000; 
-            border-radius: 10px; 
-            overflow: hidden; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+        .header {
+            background-color: var(--panel-bg);
+            padding: 15px 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border-bottom: 2px solid var(--accent-color);
         }
-        .title { margin-bottom: 20px; font-weight: normal; }
+        .header h1 { margin: 0; font-size: 24px; letter-spacing: 1px; }
         
-        /* Iframe başlangıçta gizlidir, sadece hata olursa görünür */
-        #backup-iframe { 
-            width: 100%; 
-            height: 450px; 
-            border: none; 
-            display: none; 
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 15px;
+            gap: 20px;
+        }
+        
+        /* Sol Taraf: Oynatıcı */
+        .player-section {
+            flex: 1 1 700px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .current-channel-info {
+            background: var(--panel-bg);
+            padding: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .current-channel-info img { height: 40px; border-radius: 5px; }
+        
+        #backup-iframe { width: 100%; height: 450px; border: none; display: none; }
+        
+        /* Sağ Taraf: Kanal Listesi */
+        .channel-list-section {
+            flex: 1 1 300px;
+            background: var(--panel-bg);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 550px;
+            overflow-y: auto;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .channel-list-section h3 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
+        /* Kaydırma Çubuğu (Scrollbar) Tasarımı */
+        .channel-list-section::-webkit-scrollbar { width: 8px; }
+        .channel-list-section::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        .channel-list-section::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+        
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background-color: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            gap: 15px;
+        }
+        .channel-item:hover, .channel-item.active {
+            background-color: var(--hover-color);
+            border-left: 4px solid var(--accent-color);
+            transform: translateX(5px);
+        }
+        .channel-item img {
+            width: 60px;
+            height: auto;
+            border-radius: 4px;
+            background: #fff; /* Şeffaf logolar için beyaz arka plan */
+            padding: 2px;
+        }
+        .channel-item span { font-weight: bold; font-size: 15px; }
+        
+        /* Mobil Uyumluluk */
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column; }
+            .player-section, .channel-list-section { flex: 1 1 100%; }
         }
     </style>
 </head>
 <body>
 
-    <h2 class="title" id="channel-title">Kanal Yükleniyor...</h2>
-    
-    <div class="player-container">
-        <video id="my-video" class="video-js vjs-default-skin vjs-16-9" controls preload="auto" width="100%" height="450">
-        </video>
-        <iframe id="backup-iframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+    <div class="header">
+        <h1>📺 Canlı TV Platformu</h1>
+    </div>
+
+    <div class="main-container">
+        <div class="player-section">
+            <video id="my-video" class="video-js vjs-default-skin vjs-16-9 vjs-big-play-centered" controls preload="auto" width="100%" height="100%"></video>
+            <iframe id="backup-iframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+            
+            <div class="current-channel-info" id="current-info">
+                <img id="current-logo" src="" alt="Logo" style="display:none;">
+                <span id="channel-title">Kanal Yükleniyor...</span>
+            </div>
+        </div>
+
+        <div class="channel-list-section">
+            <h3>Kanal Listesi</h3>
+            <div id="channel-list">
+                </div>
+        </div>
     </div>
 
     <script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
@@ -49,13 +137,13 @@
         const SUPABASE_URL = 'https://dxcltfiodkwyyeakhxxf.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4Y2x0ZmlvZGt3eXllYWtoeHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NTMzOTAsImV4cCI6MjA5NjIyOTM5MH0.-ehjMOMh9YYWcba4zxBC0iBZ-DGlTR4Vw2G0kpPKBnA';
 
+        let player = videojs('my-video');
         let retryCount = 0;
         const maxRetries = 3;
-        let player = videojs('my-video');
-        let currentChannel = null;
+        let activeChannel = null;
 
-        // Supabase'den sadece 'active' olan kanalları çek
-        fetch(`${SUPABASE_URL}/rest/v1/channels?status=eq.active&select=*`, {
+        // Veritabanından Kanalları Çek
+        fetch(`${SUPABASE_URL}/rest/v1/channels?status=eq.active&select=*&order=id.asc`, {
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
@@ -63,46 +151,92 @@
         })
         .then(res => res.json())
         .then(data => {
+            const listContainer = document.getElementById('channel-list');
+            
             if(data && data.length > 0) {
-                currentChannel = data[0]; 
-                document.getElementById('channel-title').innerText = currentChannel.name;
-                initPlayer(currentChannel);
+                // Kanalları listeye ekle
+                data.forEach((channel, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'channel-item';
+                    div.innerHTML = `
+                        <img src="${channel.logo_url || 'https://via.placeholder.com/60x40?text=TV'}" alt="${channel.name}">
+                        <span>${channel.name}</span>
+                    `;
+                    
+                    // Kanala tıklandığında oynatıcıyı değiştir
+                    div.onclick = () => {
+                        document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+                        div.classList.add('active');
+                        playChannel(channel);
+                    };
+                    
+                    listContainer.appendChild(div);
+
+                    // Sayfa açıldığında ilk kanalı otomatik başlat
+                    if(index === 0) {
+                        div.classList.add('active');
+                        playChannel(channel);
+                    }
+                });
             } else {
-                document.getElementById('channel-title').innerText = "Aktif kanal bulunamadı.";
+                listContainer.innerHTML = "<p>Henüz kanal bulunamadı. Bot veri çekiyor olabilir...</p>";
+                document.getElementById('channel-title').innerText = "Kanal Yok";
             }
         })
         .catch(err => {
-            console.error("API Bağlantı Hatası:", err);
-            document.getElementById('channel-title').innerText = "Veri çekilemedi.";
+            console.error("API Hatası:", err);
+            document.getElementById('channel-title').innerText = "Veritabanı bağlantı hatası.";
         });
 
-        function initPlayer(channel) {
+        // Oynatma ve Hata Yönetimi Fonksiyonu
+        function playChannel(channel) {
+            activeChannel = channel;
+            retryCount = 0; // Yeni kanala geçince hata sayacını sıfırla
+            
+            // UI Güncelleme
+            document.getElementById('channel-title').innerText = channel.name;
+            const logoImg = document.getElementById('current-logo');
+            if(channel.logo_url) {
+                logoImg.src = channel.logo_url;
+                logoImg.style.display = 'block';
+            } else {
+                logoImg.style.display = 'none';
+            }
+
+            // Oynatıcıları sıfırla
+            document.querySelector('.video-js').style.display = 'block';
+            document.getElementById('backup-iframe').style.display = 'none';
+            document.getElementById('backup-iframe').src = ""; 
+
             // Yayını başlat
             player.src({ type: 'application/x-mpegURL', src: channel.m3u8_url });
             player.play();
-
-            // Hata Yakalama ve Fallback (Yedek) Mantığı
-            player.on('error', function() {
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    document.getElementById('channel-title').innerText = `${channel.name} (Bağlantı koptu. Yeniden deneniyor... ${retryCount}/${maxRetries})`;
-                    
-                    setTimeout(() => {
-                        player.src({ type: 'application/x-mpegURL', src: channel.m3u8_url });
-                        player.play();
-                    }, 2000); 
-                } else {
-                    console.log("Yayın kurtarılamadı, Iframe yedeğine geçiliyor.");
-                    document.getElementById('channel-title').innerText = `${channel.name} (Alternatif Kaynak)`;
-                    
-                    document.querySelector('.video-js').style.display = 'none'; 
-                    
-                    const iframe = document.getElementById('backup-iframe');
-                    iframe.src = channel.iframe_url; 
-                    iframe.style.display = 'block'; 
-                }
-            });
         }
+
+        // Kendi Kendini Onaran Oynatıcı Mantığı
+        player.on('error', function() {
+            if(!activeChannel) return;
+
+            if (retryCount < maxRetries) {
+                retryCount++;
+                document.getElementById('channel-title').innerText = `${activeChannel.name} (Bağlantı koptu. Yeniden deneniyor... ${retryCount}/${maxRetries})`;
+                
+                setTimeout(() => {
+                    player.src({ type: 'application/x-mpegURL', src: activeChannel.m3u8_url });
+                    player.play();
+                }, 2000); 
+            } else {
+                console.log("Yayın kurtarılamadı, alternatif kaynağa geçiliyor.");
+                document.getElementById('channel-title').innerText = `${activeChannel.name} (Alternatif Kaynak)`;
+                
+                document.querySelector('.video-js').style.display = 'none'; 
+                
+                const iframe = document.getElementById('backup-iframe');
+                // Eğer veritabanında yedek iframe yoksa, uyarı göster
+                iframe.src = activeChannel.iframe_url || 'about:blank'; 
+                iframe.style.display = 'block'; 
+            }
+        });
     </script>
 </body>
 </html>
